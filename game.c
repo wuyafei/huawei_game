@@ -204,8 +204,10 @@ int main(int argc, char *argv[]){
 	int mycard[7]={0}, money[8]={0}, jetton[8]={0};
 	char buf[4096] = {'\0'};
 	int len = 0, ii = 0, tt = 0, sta = 0, end = 0;
-	int game_num = 0;
+	int game_num = 0, b_id, bb_id, sb_id, b_jetton, bb_jetton, sb_jetton, b_money, bb_money, sb_money;
 
+	char id_buf[10], jetton_buf[10], money_buf[10];
+	int player_num=0;
 	// play game start
 	while(1){
 		if (buf[0]=='\0')
@@ -215,8 +217,37 @@ int main(int argc, char *argv[]){
 			break;
 		game_num ++;	printf("start play game: %d\n",game_num);
 		printf("0\n");printf("%s", buf);
-
 		//handle seat-info-msg
+			//button
+		sta = strpchr(buf, len, '\n', 0) + 1;
+		sta = strpchr(buf, len, ':', sta) + 2;
+                end = strpchr(buf, len, ' ', sta);
+		b_id = atoi(substr(id_buf, buf, len ,sta, end-sta));
+		sta = end + 1;
+		end = strpchr(buf, len, ' ', sta);
+		b_jetton = atoi(substr(jetton_buf, buf, len ,sta, end-sta));
+		sta = end + 1;
+		end = strpchr(buf, len, ' ', sta);
+		b_money = atoi(substr(money_buf, buf, len ,sta, end-sta));
+		//small blind
+		sta = end + 2;
+		sta = strpchr(buf, len, ':', sta) + 2;
+		end = strpchr(buf, len, ' ', sta);
+                sb_id = atoi(substr(id_buf, buf, len ,sta, end-sta));
+                sta = end + 1;
+                end = strpchr(buf, len, ' ', sta);
+                sb_jetton = atoi(substr(jetton_buf, buf, len ,sta, end-sta));
+                sta = end + 1;
+                end = strpchr(buf, len, ' ', sta);
+                sb_money = atoi(substr(money_buf, buf, len ,sta, end-sta));
+		if (buf[end+2]!='/')
+		{
+			
+		}
+		else player_num = 2;
+
+		//big blind
+		//
 		end = strpchr(buf, len, '/', 5)+6;//to read out entire the seat message
 		sta = end + 1;
 		strnmv(buf, len, sta);
@@ -226,6 +257,7 @@ int main(int argc, char *argv[]){
 		if (buf[0]=='\0')
 			len = recv(my_socket, buf,sizeof(buf)-1, 0);buf[len]='\0';
 		printf("1\n");printf("%s\n", buf);
+
 		sta = strpchr(buf, len, '\n', 0) + 1;
 		end = strpchr(buf, len, ':', sta);
 		char pid_buf[10];
@@ -234,9 +266,9 @@ int main(int argc, char *argv[]){
 		end = strpchr(buf, len, ' ', sta);
 		char bet_buf[20];
 		int sb_bet = atoi(substr(bet_buf, buf, len, sta, end-sta));
-		//printf("small blind: %d, %d\n", sb_pid, sb_bet);
+		printf("small blind: %d, %d\n", sb_pid, sb_bet);
 
-		end = strpchr(buf, len, '/', end)+7;// to read out the entire blind message
+		end = strpchr(buf, len, '/', 6)+7;// to read out the entire blind message
                 sta = end + 1;
                 strnmv(buf, len, sta);
                 len = len - sta;
@@ -259,13 +291,12 @@ int main(int argc, char *argv[]){
 		int b_go_on = check_hold_cards(mycard[0], mycard[1]);
 		printf("card1: %d, card2: %d, go on: %d\n", mycard[0], mycard[1], b_go_on);
 		
-		end = strpchr(buf, len, '/', end)+6;
+		end = strpchr(buf, len, '/', 5)+6;
                 sta = end + 1;
                 strnmv(buf, len, sta);
                 len = len - sta;
 
-		//must be inquire-msg
-		tt = 0;
+		//inquire-msg for hold round bet
 		while(1){
 			printf("3\n");
 			if (buf[0]=='\0')
@@ -275,7 +306,7 @@ int main(int argc, char *argv[]){
 			{
 				printf("%s\n", buf);
 				char act_msg[20];
-				if(b_go_on == 1)
+				if(b_go_on == 1 || player_num == 2)
 					snprintf(act_msg, sizeof(act_msg)-1, "check \n");
 				else
 					snprintf(act_msg, sizeof(act_msg)-1, "fold \n");
@@ -320,12 +351,12 @@ int main(int argc, char *argv[]){
 			b_go_on = check_cards(mycard, 5);
 			printf("go on: %d\n", b_go_on);
 
-			end = strpchr(buf, len, '/', end)+6;
+			end = strpchr(buf, len, '/', 5)+6;
 			sta = end + 1;
 			strnmv(buf, len, sta);
 			len = len - sta;
 
-			//inquire-msg
+			//inquire-msg for flop round bet
 			while(1){
 				printf("5\n");
 				if (buf[0]=='\0')
@@ -333,11 +364,11 @@ int main(int argc, char *argv[]){
                 		if (strncmp(buf,"inquire",7)==0)
 	                        {
 	                                printf("%s\n", buf);
-									if(b_go_on<=1)
+					if(b_go_on<=1)
 	                                	send(my_socket, "check \n", 8, 0);
-									else if(b_go_on==2)
-	                                	send(my_socket, "raise 1000 \n", 13, 0);
-									else 
+					else if(b_go_on==2)
+		                               	send(my_socket, "raise 1000 \n", 13, 0);
+					else 
 	                                	send(my_socket, "all_in \n", 9, 0);
 	
 	                                end = strpchr(buf, len, '/', 8)+9;
@@ -367,15 +398,15 @@ int main(int argc, char *argv[]){
                 		end = strpchr(buf, len, ' ', sta);
                 		mycard[5]=card2num(buf[sta], buf[end+1]);
 
-						b_go_on = check_cards(mycard, 6);
-						printf("go on: %d\n", b_go_on);
+					b_go_on = check_cards(mycard, 6);
+					printf("go on: %d\n", b_go_on);
 
-				end = strpchr(buf, len, '/', end)+6;
+				end = strpchr(buf, len, '/', 5)+6;
                 		sta = end + 1;
                 		strnmv(buf, len, sta);
                 		len = len - sta;
 
-				//inquire-msg
+				//inquire-msg for turn round bet
                 		while(1){
 					printf("7\n");
 					if (buf[0]=='\0')
@@ -423,12 +454,12 @@ int main(int argc, char *argv[]){
 							b_go_on = check_cards(mycard, 7);
 							printf("go on: %d\n", b_go_on);
 
-					end = strpchr(buf, len, '/', end)+7;
+					end = strpchr(buf, len, '/', 6)+7;
                 			sta = end + 1;
                 			strnmv(buf, len, sta);
                 			len = len - sta;
 
-					//inquire-msg
+					//inquire-msg river round bet
                 			while(1){
                         			printf("9\n");
 						if (buf[0]=='\0')
@@ -493,7 +524,7 @@ int main(int argc, char *argv[]){
                 //sta = strpchr(buf, len, '\n', end) + 1;
                 //end = strpchr(buf, len, ' ', sta);
 		
-		end = strpchr(buf, len, '/', end)+9;
+		end = strpchr(buf, len, '/', 8)+9;
                 sta = end + 1;
                 strnmv(buf, len, sta);
                 len = len - sta;
